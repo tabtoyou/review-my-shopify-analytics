@@ -77,13 +77,55 @@ class ShopInfoExtractor:
             return ""
 
     def clean_url(self, url: str) -> str:
-        """URL 정리 (쿼리 파라미터 제거 등)"""
+        """
+        URL 정리 및 정규화
+        - Markdown 형식 제거
+        - 괄호, 대괄호 제거
+        - 개별 페이지를 홈페이지로 변환
+        - 쿼리 파라미터 제거
+        """
         try:
+            # 1. Markdown 링크 형식 제거: [text](url) → url
+            if '](http' in url:
+                # [text](url) 형식에서 url 부분만 추출
+                url = url.split('](')[1] if '](http' in url else url
+
+            # 2. 괄호, 대괄호 제거
+            url = url.rstrip(')')
+            url = url.rstrip(']')
+            url = url.lstrip('[')
+
+            # 3. URL 파싱
             parsed = urlparse(url)
-            clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-            return clean.rstrip('/')
-        except:
-            return url
+
+            # 4. 개별 페이지를 홈페이지로 변환
+            path = parsed.path
+
+            # /products/, /collections/, /blogs/, /pages/ 등은 제거
+            unwanted_paths = ['/products/', '/collections/', '/blogs/', '/pages/', '/apps/']
+            for unwanted in unwanted_paths:
+                if unwanted in path:
+                    path = '/'
+                    break
+
+            # /s/, /p/ 같은 단축 경로도 제거
+            if path.startswith('/s/') or path.startswith('/p/'):
+                path = '/'
+
+            # 5. 깨끗한 URL 재구성
+            if not parsed.scheme:
+                # scheme이 없으면 https 추가
+                url = f"https://{url}"
+                parsed = urlparse(url)
+
+            clean = f"{parsed.scheme}://{parsed.netloc}{path}"
+            clean = clean.rstrip('/')
+
+            return clean
+
+        except Exception as e:
+            # 정리 실패 시 원본 반환 (최소한 괄호는 제거)
+            return url.rstrip(')').rstrip(']')
 
     def fetch_page_content(self, url: str, timeout: int = 10) -> Optional[str]:
         """
@@ -225,6 +267,33 @@ class ShopInfoExtractor:
         # 상위 5개만 반환
         return ', '.join(list(categories)[:5]) if categories else ""
 
+    def is_valid_shop_url(self, url: str) -> bool:
+        """
+        쇼핑몰 URL인지 검증
+
+        Args:
+            url: 검증할 URL
+
+        Returns:
+            유효한 쇼핑몰 URL이면 True
+        """
+        # 제외할 패턴들
+        invalid_patterns = [
+            'apps.shopify.com',      # Shopify 앱 스토어
+            'community.shopify.com', # Shopify 커뮤니티
+            'help.shopify.com',      # Shopify 헬프
+            'linkedin.com',
+            'facebook.com',
+            'instagram.com',
+            'twitter.com',
+            'youtube.com',
+            'tiktok.com',
+            'pinterest.com',
+        ]
+
+        url_lower = url.lower()
+        return not any(pattern in url_lower for pattern in invalid_patterns)
+
     def extract_shop_info_with_scraping(self) -> List[Dict[str, Any]]:
         """
         모든 게시물에서 쇼핑몰 정보 추출 (웹 스크래핑 포함)
@@ -251,8 +320,13 @@ class ShopInfoExtractor:
             if not shop_urls:
                 continue
 
-            # 첫 번째 URL을 주 사이트로 사용
+            # 첫 번째 URL을 주 사이트로 사용 (정리 및 검증)
             main_url = self.clean_url(shop_urls[0])
+
+            # URL 유효성 검증 (SNS, 앱 스토어 등 제외)
+            if not self.is_valid_shop_url(main_url):
+                print(f"  [{idx}/{len(self.raw_data)}] 건너뛰기: {main_url} (유효하지 않은 URL)")
+                continue
             domain_name = self.get_domain_name(main_url)
             is_shopify = "myshopify.com" in main_url or ".myshopify.com" in main_url
 
