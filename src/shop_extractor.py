@@ -374,6 +374,7 @@ class ShopInfoExtractor:
                 print(f"  [{idx}/{len(self.raw_data)}] 건너뛰기: {main_url} (유효하지 않은 URL)")
                 continue
             domain_name = self.get_domain_name(main_url)
+            # 초기 Shopify 감지 (URL 기반)
             is_shopify = "myshopify.com" in main_url or ".myshopify.com" in main_url
 
             print(f"  [{idx}/{len(self.raw_data)}] 처리 중: {domain_name}... ", end='', flush=True)
@@ -397,9 +398,13 @@ class ShopInfoExtractor:
                     # 카테고리 추출
                     categories = self.extract_categories_from_page(html, main_url)
 
-                    # Shopify 스토어인 경우 상품 수 확인
-                    if is_shopify:
-                        product_count = self.get_shopify_product_count(main_url)
+                    # 모든 URL에 대해 Shopify products.json 시도
+                    # (커스텀 도메인을 사용하는 Shopify 스토어 감지)
+                    product_count = self.get_shopify_product_count(main_url)
+
+                    # products.json이 성공하면 Shopify 스토어로 확인
+                    if product_count > 0:
+                        is_shopify = True
 
                     print(f"✓ (이메일: {bool(email)}, 상품: {product_count}, 카테고리: {bool(categories)})")
                 else:
@@ -411,7 +416,7 @@ class ShopInfoExtractor:
             # Rate limiting
             time.sleep(1)  # 각 요청 사이 1초 대기
 
-            # 쇼핑몰 타입 추측
+            # 쇼핑몰 타입 결정 (products.json 성공 여부 반영)
             shop_type = "Shopify" if is_shopify else "E-commerce"
 
             # 게시물 문제 분류
