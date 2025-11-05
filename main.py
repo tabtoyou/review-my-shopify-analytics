@@ -89,14 +89,11 @@ def run_analyzer(data_path: str):
     timestamp = analyzer.save_analysis_results()
     print(f"\n✓ 기본 분석 결과 CSV 파일 저장 완료")
 
-    # 쇼핑몰 정보 추출
-    print("\n🏪 쇼핑몰 정보 추출")
+    # 쇼핑몰 정보 추출 (웹 스크래핑 포함)
+    print("\n🏪 쇼핑몰 정보 추출 (웹 스크래핑)")
     print("-" * 70)
     shop_extractor = ShopInfoExtractor(data_path)
-    shops = shop_extractor.extract_shop_info()
-    if shops:
-        print(f"  총 {len(shops)}개의 쇼핑몰 URL 발견")
-        shop_extractor.save_to_csv()
+    shop_extractor.save_to_csv()
 
     # 구체적인 문제 분류
     print("\n🎯 구체적인 문제 분류 (사업 기회 분석)")
