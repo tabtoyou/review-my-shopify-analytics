@@ -182,6 +182,52 @@ class ShopInfoExtractor:
 
         return valid_emails[0] if valid_emails else ""
 
+    def find_email_from_common_pages(self, base_url: str) -> str:
+        """
+        Contact Us, About Us 등 일반적인 페이지에서 이메일 찾기
+
+        Args:
+            base_url: 웹사이트 기본 URL
+
+        Returns:
+            발견된 이메일 주소 또는 빈 문자열
+        """
+        # 시도할 페이지 경로들 (우선순위 순)
+        contact_paths = [
+            '/contact',
+            '/contact-us',
+            '/contactus',
+            '/contact_us',
+            '/about',
+            '/about-us',
+            '/aboutus',
+            '/about_us',
+            '/pages/contact',
+            '/pages/contact-us',
+            '/pages/about',
+            '/pages/about-us',
+        ]
+
+        base_url = base_url.rstrip('/')
+
+        for path in contact_paths:
+            try:
+                page_url = f"{base_url}{path}"
+                html = self.fetch_page_content(page_url, timeout=8)
+
+                if html:
+                    email = self.extract_email_from_page(html)
+                    if email:
+                        return email
+
+                # Rate limiting (각 페이지 사이 0.5초)
+                time.sleep(0.5)
+
+            except Exception as e:
+                continue
+
+        return ""
+
     def get_shopify_product_count(self, url: str) -> int:
         """
         Shopify 스토어의 상품 수 가져오기 (/products.json API 사용)
@@ -341,8 +387,12 @@ class ShopInfoExtractor:
                 html = self.fetch_page_content(main_url, timeout=10)
 
                 if html:
-                    # 이메일 추출
+                    # 이메일 추출 (메인 페이지)
                     email = self.extract_email_from_page(html)
+
+                    # 메인 페이지에서 이메일을 못 찾으면 Contact/About 페이지 시도
+                    if not email:
+                        email = self.find_email_from_common_pages(main_url)
 
                     # 카테고리 추출
                     categories = self.extract_categories_from_page(html, main_url)
