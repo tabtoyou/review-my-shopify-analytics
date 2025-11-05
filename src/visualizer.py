@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import seaborn as sns
 import pandas as pd
+import numpy as np
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -304,6 +305,63 @@ class DataVisualizer:
         self.create_summary_dashboard(f"{output_dir}/dashboard_{timestamp}.png")
 
         print(f"\n✓ 모든 시각화 저장 완료: {output_dir}/")
+
+    def plot_problem_categories(self, classifier, output_dir: str = None):
+        """
+        구체적인 문제 카테고리 시각화
+
+        Args:
+            classifier: ProblemClassifier 인스턴스
+            output_dir: 저장 디렉토리
+        """
+        if output_dir is None:
+            output_dir = config.OUTPUT_DIR
+
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # 문제 통계 가져오기
+        problem_stats = classifier.get_problem_statistics()
+
+        if problem_stats.empty:
+            print("⚠ 문제 분류 데이터가 없습니다.")
+            return
+
+        # 그래프 생성
+        fig, axes = plt.subplots(1, 2, figsize=(18, 8))
+
+        # 1. 문제 빈도 (TOP 15)
+        top_problems = problem_stats.head(15)
+        ax1 = axes[0]
+        bars = ax1.barh(range(len(top_problems)), top_problems['Frequency'].values,
+                       color=plt.cm.Spectral(np.linspace(0, 1, len(top_problems))))
+        ax1.set_yticks(range(len(top_problems)))
+        ax1.set_yticklabels(top_problems['Problem Category'].values, fontsize=9)
+        ax1.set_xlabel('Frequency', fontsize=11)
+        ax1.set_title('Top Problem Categories (Frequency)', fontsize=13, fontweight='bold')
+        ax1.invert_yaxis()
+
+        # 값 표시
+        for i, (bar, val) in enumerate(zip(bars, top_problems['Frequency'].values)):
+            ax1.text(val + 0.1, i, f'{int(val)}', va='center', fontsize=9)
+
+        # 2. 사업 기회 우선순위 (TOP 10)
+        opportunities = classifier.get_business_opportunities().head(10)
+        ax2 = axes[1]
+        bars2 = ax2.barh(range(len(opportunities)), opportunities['Priority Score'].values,
+                        color=plt.cm.viridis(np.linspace(0, 1, len(opportunities))))
+        ax2.set_yticks(range(len(opportunities)))
+        ax2.set_yticklabels(opportunities['Problem Category'].values, fontsize=9)
+        ax2.set_xlabel('Priority Score (Frequency × Avg Comments)', fontsize=11)
+        ax2.set_title('Business Opportunities (Priority)', fontsize=13, fontweight='bold')
+        ax2.invert_yaxis()
+
+        plt.tight_layout()
+
+        save_path = f"{output_dir}/problem_categories_{timestamp}.png"
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"✓ 문제 카테고리 시각화 저장: {save_path}")
+        plt.close()
 
 
 def main():

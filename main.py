@@ -12,6 +12,8 @@ from datetime import datetime
 from src.crawler import RedditCrawler
 from src.analyzer import RedditAnalyzer
 from src.visualizer import DataVisualizer
+from src.shop_extractor import ShopInfoExtractor
+from src.problem_classifier import ProblemClassifier
 import config
 
 
@@ -85,12 +87,39 @@ def run_analyzer(data_path: str):
 
     # 결과 저장
     timestamp = analyzer.save_analysis_results()
-    print(f"\n✓ 분석 결과 CSV 파일 저장 완료")
+    print(f"\n✓ 기본 분석 결과 CSV 파일 저장 완료")
+
+    # 쇼핑몰 정보 추출
+    print("\n🏪 쇼핑몰 정보 추출")
+    print("-" * 70)
+    shop_extractor = ShopInfoExtractor(data_path)
+    shops = shop_extractor.extract_shop_info()
+    if shops:
+        print(f"  총 {len(shops)}개의 쇼핑몰 URL 발견")
+        shop_extractor.save_to_csv()
+
+    # 구체적인 문제 분류
+    print("\n🎯 구체적인 문제 분류 (사업 기회 분석)")
+    print("-" * 70)
+    classifier = ProblemClassifier(data_path)
+    problem_stats = classifier.get_problem_statistics()
+    print(problem_stats.head(10).to_string(index=False))
+
+    # 사업 기회 우선순위
+    print("\n💡 사업 기회 우선순위 TOP 5")
+    print("-" * 70)
+    opportunities = classifier.get_business_opportunities()
+    print(opportunities.head(5).to_string(index=False))
+
+    # 문제 분류 결과 저장
+    problem_stats.to_csv(f'output/problem_categories_{timestamp}.csv', index=False, encoding='utf-8-sig')
+    opportunities.to_csv(f'output/business_opportunities_{timestamp}.csv', index=False, encoding='utf-8-sig')
+    print(f"\n✓ 모든 분석 결과 저장 완료")
 
     return analyzer, timestamp
 
 
-def run_visualizer(analyzer: RedditAnalyzer):
+def run_visualizer(analyzer: RedditAnalyzer, data_path: str):
     """시각화 도구 실행"""
     print("\n" + "="*70)
     print("STEP 3: 데이터 시각화")
@@ -98,6 +127,11 @@ def run_visualizer(analyzer: RedditAnalyzer):
 
     visualizer = DataVisualizer(analyzer)
     visualizer.generate_all_visualizations()
+
+    # 문제 분류 시각화 추가
+    print("\n📊 문제 분류 시각화 생성 중...")
+    classifier = ProblemClassifier(data_path)
+    visualizer.plot_problem_categories(classifier)
 
     print("\n✓ 모든 그래프 생성 완료")
 
@@ -133,7 +167,7 @@ def main():
         analyzer, timestamp = run_analyzer(data_path)
 
         # 3. 시각화
-        run_visualizer(analyzer)
+        run_visualizer(analyzer, data_path)
 
         # 완료 메시지
         print("\n" + "="*70)
@@ -167,7 +201,7 @@ def main():
                 return
             latest_file = max(data_files, key=os.path.getctime)
             analyzer = RedditAnalyzer(latest_file)
-            run_visualizer(analyzer)
+            run_visualizer(analyzer, latest_file)
 
 
 if __name__ == "__main__":
