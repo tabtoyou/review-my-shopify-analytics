@@ -9,9 +9,14 @@ from urllib.parse import urlparse
 import pandas as pd
 from typing import List, Dict, Any, Optional
 import os
+import sys
 import requests
 from bs4 import BeautifulSoup
 import time
+
+# problem_classifier import
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.problem_classifier import ProblemClassifier, PROBLEM_CATEGORIES
 
 
 class ShopInfoExtractor:
@@ -29,6 +34,9 @@ class ShopInfoExtractor:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
+
+        # 문제 분류기 초기화
+        self.classifier = ProblemClassifier(data_path)
 
     def extract_urls_from_text(self, text: str) -> List[str]:
         """텍스트에서 URL 추출"""
@@ -282,6 +290,16 @@ class ShopInfoExtractor:
             # 쇼핑몰 타입 추측
             shop_type = "Shopify" if is_shopify else "E-commerce"
 
+            # 게시물 문제 분류
+            problem_categories = self.classifier.classify_post(post)
+            primary_problem = problem_categories[0] if problem_categories else "Unclassified"
+            all_problems = ", ".join(problem_categories[:3]) if problem_categories else ""
+
+            # 사업 기회 매핑
+            business_opportunity = ""
+            if primary_problem in PROBLEM_CATEGORIES:
+                business_opportunity = PROBLEM_CATEGORIES[primary_problem]['business_opportunity']
+
             shop_info = {
                 'No': idx,
                 'DTC Name': domain_name.title() if domain_name else "",
@@ -298,6 +316,9 @@ class ShopInfoExtractor:
                 'Post Title': post.get('title', ''),
                 'Post Score': post.get('score', 0),
                 'Num Comments': post.get('num_comments', 0),
+                'Primary Problem': primary_problem,
+                'All Problems': all_problems,
+                'Business Opportunity': business_opportunity,
             }
 
             shops.append(shop_info)
